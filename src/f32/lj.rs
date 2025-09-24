@@ -2,6 +2,7 @@ use std::simd::{LaneCount, StdFloat, SupportedLaneCount, prelude::*};
 
 use crate::f32::transpose::{transpose_nd, untranspose_nd};
 
+#[inline(always)]
 fn array_sum<const N: usize>(x: [f32; N], y: [f32; N]) -> [f32; N] {
     let mut ans = [0.0; N];
 
@@ -12,6 +13,7 @@ fn array_sum<const N: usize>(x: [f32; N], y: [f32; N]) -> [f32; N] {
     ans
 }
 
+#[inline(always)]
 fn array_diff<const N: usize>(x: [f32; N], y: [f32; N]) -> [f32; N] {
     let mut ans = [0.0; N];
 
@@ -23,6 +25,7 @@ fn array_diff<const N: usize>(x: [f32; N], y: [f32; N]) -> [f32; N] {
 }
 
 // Returns sum(u_i * v_i)
+#[inline(always)]
 fn dot<const N: usize>(u: [f32; N], v: [f32; N]) -> f32 {
     let mut ans = 0.0;
 
@@ -36,6 +39,7 @@ fn dot<const N: usize>(u: [f32; N], v: [f32; N]) -> f32 {
 // E = 4 * e * (k^2 - k) = 4 * e * k * (k - 1)
 // k = (s/r)^6
 // r = |r1 - r2|
+#[inline(always)]
 pub fn lj_energy<const N: usize>(
     r1: [f32; N],
     r2: [f32; N],
@@ -76,6 +80,7 @@ pub fn lj_energy<const N: usize>(
 // E = c * (k - 1)
 // dE/dr1_i = -3 * c * (2k - 1) * v^-1 * r_i
 // c = 4 * e * k
+#[inline(always)]
 fn lj_gradient<const N: usize>(
     r1: [f32; N],
     r2: [f32; N],
@@ -142,15 +147,16 @@ pub fn compute_lj_forces<const N: usize>(
 // k = u^3
 // u = s^2 * v^-1
 // v = r^2
-pub fn compute_pair_lj_forces_block<
+#[inline(always)]
+fn compute_pair_lj_forces_block<
     const D: usize, // Number of dimensions
     const M: usize, // Number of A particles
 >(
-    coords_a: [[f32; M]; D],
+    coords_a: [Simd<f32, M>; D],
     coords_b: &[[f32; D]],
     sigma: f32,
     eps: f32,
-) -> (f32, [[f32; M]; D])
+) -> (Simd<f32, M>, [[f32; M]; D])
 where
     LaneCount<M>: SupportedLaneCount,
 {
@@ -198,10 +204,9 @@ where
         }
     }
 
-    let energy = energy_acc.reduce_sum();
     let forces_a = forces_a.map(Simd::into);
 
-    (energy, forces_a)
+    (energy_acc, forces_a)
 }
 
 pub fn compute_pair_lj_forces_blockwise<const D: usize>(
@@ -211,30 +216,33 @@ pub fn compute_pair_lj_forces_blockwise<const D: usize>(
     sigma: f32,
     eps: f32,
 ) -> f32 {
-    let mut energy = 0.0;
-
     let (a_chunks, a_rest) = coords_a.as_chunks::<16>();
     let (f_chunks, f_rest) = forces_a.as_chunks_mut();
 
+    let mut energy_vec = Simd::splat(0.0);
+
     for (coords, forces) in a_chunks.iter().zip(f_chunks) {
-        let coords_t = transpose_nd(*coords);
+        let coords_t = transpose_nd(*coords).map(Simd::from);
         let (energy_contrib, forces_t) =
             compute_pair_lj_forces_block(coords_t, coords_b, sigma, eps);
 
-        energy += energy_contrib;
+        energy_vec += energy_contrib;
 
         *forces = untranspose_nd(forces_t);
     }
+
+    let energy = energy_vec.reduce_sum();
+    let mut energy_vec = Simd::splat(0.0);
 
     let (a_chunks, a_rest) = a_rest.as_chunks::<8>();
     let (f_chunks, f_rest) = f_rest.as_chunks_mut();
 
     for (coords, forces) in a_chunks.iter().zip(f_chunks) {
-        let coords_t = transpose_nd(*coords);
+        let coords_t = transpose_nd(*coords).map(Simd::from);
         let (energy_contrib, forces_t) =
             compute_pair_lj_forces_block(coords_t, coords_b, sigma, eps);
 
-        energy += energy_contrib;
+        energy_vec += energy_contrib;
 
         *forces = untranspose_nd(forces_t);
     }
@@ -249,10 +257,16 @@ pub fn compute_pair_lj_forces_blockwise<const D: usize>(
     }
 
     let coords_t = transpose_nd(a_pad);
-    let (energy_contrib, forces_t) =
-        compute_pair_lj_forces_block(coords_t, coords_b, sigma, eps);
+    let (energy_contrib, forces_t) = compute_pair_lj_forces_block(
+        coords_t.map(Simd::from),
+        coords_b,
+        sigma,
+        eps,
+    );
 
-    energy += energy_contrib;
+    energy_vec += energy_contrib;
+
+    let energy = energy + energy_vec.reduce_sum();
 
     let f_pad = untranspose_nd(forces_t);
     for (dest, &src) in f_rest.iter_mut().zip(&f_pad) {

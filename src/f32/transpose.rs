@@ -21,10 +21,8 @@ where
 
 #[inline(always)]
 fn transpose_3d_2(rows: [[f32; 3]; 2]) -> [[f32; 2]; 3] {
-    let mut data = [0.0; 6];
-    for (i, &x) in rows.as_flattened().iter().enumerate() {
-        data[i] = x;
-    }
+    let data: [f32; 6] =
+        unsafe { rows.as_flattened().as_chunks_unchecked()[0] };
 
     let v = simd_swizzle!(Simd::from(data), [0, 3, 1, 4, 2, 5]);
 
@@ -34,10 +32,8 @@ fn transpose_3d_2(rows: [[f32; 3]; 2]) -> [[f32; 2]; 3] {
 
 #[inline(always)]
 fn transpose_3d_4(rows: [[f32; 3]; 4]) -> [[f32; 4]; 3] {
-    let mut data = [0.0; 12];
-    for (i, &x) in rows.as_flattened().iter().enumerate() {
-        data[i] = x;
-    }
+    let data: [f32; 12] =
+        unsafe { rows.as_flattened().as_chunks_unchecked()[0] };
 
     let v =
         simd_swizzle!(Simd::from(data), [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11]);
@@ -48,10 +44,8 @@ fn transpose_3d_4(rows: [[f32; 3]; 4]) -> [[f32; 4]; 3] {
 
 #[inline(always)]
 fn transpose_3d_8(rows: [[f32; 3]; 8]) -> [[f32; 8]; 3] {
-    let mut data = [0.0; 24];
-    for (i, &x) in rows.as_flattened().iter().enumerate() {
-        data[i] = x;
-    }
+    let data: [f32; 24] =
+        unsafe { rows.as_flattened().as_chunks_unchecked()[0] };
 
     let v = simd_swizzle!(
         Simd::from(data),
@@ -67,10 +61,8 @@ fn transpose_3d_8(rows: [[f32; 3]; 8]) -> [[f32; 8]; 3] {
 
 #[inline(always)]
 fn transpose_3d_16(rows: [[f32; 3]; 16]) -> [[f32; 16]; 3] {
-    let mut data = [0.0; 48];
-    for (i, &x) in rows.as_flattened().iter().enumerate() {
-        data[i] = x;
-    }
+    let data: [f32; 48] =
+        unsafe { rows.as_flattened().as_chunks_unchecked()[0] };
 
     let v = simd_swizzle!(
         Simd::from(data),
@@ -159,10 +151,8 @@ where
 
 #[inline(always)]
 fn untranspose_3d_2(cols: [[f32; 2]; 3]) -> [[f32; 3]; 2] {
-    let mut data = [0.0; 6];
-    for (i, &x) in cols.as_flattened().iter().enumerate() {
-        data[i] = x;
-    }
+    let data: [f32; 6] =
+        unsafe { cols.as_flattened().as_chunks_unchecked()[0] };
 
     let v = simd_swizzle!(Simd::from(data), [0, 2, 4, 1, 3, 5]);
 
@@ -172,10 +162,8 @@ fn untranspose_3d_2(cols: [[f32; 2]; 3]) -> [[f32; 3]; 2] {
 
 #[inline(always)]
 fn untranspose_3d_4(cols: [[f32; 4]; 3]) -> [[f32; 3]; 4] {
-    let mut data = [0.0; 12];
-    for (i, &x) in cols.as_flattened().iter().enumerate() {
-        data[i] = x;
-    }
+    let data: [f32; 12] =
+        unsafe { cols.as_flattened().as_chunks_unchecked()[0] };
 
     let v =
         simd_swizzle!(Simd::from(data), [0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11]);
@@ -186,10 +174,8 @@ fn untranspose_3d_4(cols: [[f32; 4]; 3]) -> [[f32; 3]; 4] {
 
 #[inline(always)]
 fn untranspose_3d_8(cols: [[f32; 8]; 3]) -> [[f32; 3]; 8] {
-    let mut data = [0.0; 24];
-    for (i, &x) in cols.as_flattened().iter().enumerate() {
-        data[i] = x;
-    }
+    let data: [f32; 24] =
+        unsafe { cols.as_flattened().as_chunks_unchecked()[0] };
 
     let v = simd_swizzle!(
         Simd::from(data),
@@ -205,10 +191,8 @@ fn untranspose_3d_8(cols: [[f32; 8]; 3]) -> [[f32; 3]; 8] {
 
 #[inline(always)]
 fn untranspose_3d_16(cols: [[f32; 16]; 3]) -> [[f32; 3]; 16] {
-    let mut data = [0.0; 48];
-    for (i, &x) in cols.as_flattened().iter().enumerate() {
-        data[i] = x;
-    }
+    let data: [f32; 48] =
+        unsafe { cols.as_flattened().as_chunks_unchecked()[0] };
 
     let v = simd_swizzle!(
         Simd::from(data),
