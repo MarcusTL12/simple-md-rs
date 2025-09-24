@@ -1,5 +1,7 @@
 use std::simd::{LaneCount, StdFloat, SupportedLaneCount, prelude::*};
 
+use crate::f32::transpose::{transpose_nd, untranspose_nd};
+
 fn array_sum<const N: usize>(x: [f32; N], y: [f32; N]) -> [f32; N] {
     let mut ans = [0.0; N];
 
@@ -202,11 +204,60 @@ where
     (energy, forces_a)
 }
 
-pub fn compute_lj_forces_blockwise<const N: usize>(
-    coords: &[[f32; N]],
-    forces: &mut [[f32; N]],
+pub fn compute_pair_lj_forces_blockwise<const D: usize>(
+    coords_a: &[[f32; D]],
+    coords_b: &[[f32; D]],
+    forces_a: &mut [[f32; D]],
     sigma: f32,
     eps: f32,
 ) -> f32 {
-    todo!()
+    let mut energy = 0.0;
+
+    let (a_chunks, a_rest) = coords_a.as_chunks::<16>();
+    let (f_chunks, f_rest) = forces_a.as_chunks_mut();
+
+    for (coords, forces) in a_chunks.iter().zip(f_chunks) {
+        let coords_t = transpose_nd(*coords);
+        let (energy_contrib, forces_t) =
+            compute_pair_lj_forces_block(coords_t, coords_b, sigma, eps);
+
+        energy += energy_contrib;
+
+        *forces = untranspose_nd(forces_t);
+    }
+
+    let (a_chunks, a_rest) = a_rest.as_chunks::<8>();
+    let (f_chunks, f_rest) = f_rest.as_chunks_mut();
+
+    for (coords, forces) in a_chunks.iter().zip(f_chunks) {
+        let coords_t = transpose_nd(*coords);
+        let (energy_contrib, forces_t) =
+            compute_pair_lj_forces_block(coords_t, coords_b, sigma, eps);
+
+        energy += energy_contrib;
+
+        *forces = untranspose_nd(forces_t);
+    }
+
+    if a_rest.is_empty() {
+        return energy;
+    }
+
+    let mut a_pad = [[0.0; D]; 8];
+    for (dest, &src) in a_pad.iter_mut().zip(a_rest) {
+        *dest = src;
+    }
+
+    let coords_t = transpose_nd(a_pad);
+    let (energy_contrib, forces_t) =
+        compute_pair_lj_forces_block(coords_t, coords_b, sigma, eps);
+
+    energy += energy_contrib;
+
+    let f_pad = untranspose_nd(forces_t);
+    for (dest, &src) in f_rest.iter_mut().zip(&f_pad) {
+        *dest = src;
+    }
+
+    energy
 }
